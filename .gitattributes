@@ -1,0 +1,17 @@
+# 设置默认行为，以防人们没有设置core.autocrlf
+* text=auto
+
+# 明确声明应该规范化的文本文件
+*.cpp text
+*.h text
+*.c text
+*.hpp text
+*.txt text
+*.md text
+
+# 声明二进制文件，不应被修改
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.zip binary

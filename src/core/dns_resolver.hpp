@@ -1,0 +1,30 @@
+#pragma once
+#include <string>
+#include <future>
+#include "../utils/inet_address.hpp"
+
+namespace lwip {
+
+class DNSResolver {
+public:
+    static DNSResolver& instance();
+    
+    std::future<InetAddress> resolve(const std::string& hostname);
+    void add_dns_server(const InetAddress& server);
+    void set_timeout(std::chrono::milliseconds timeout);
+
+private:
+    struct DNSHeader {
+        uint16_t id;
+        uint16_t flags;
+        uint16_t questions;
+        uint16_t answers;
+        uint16_t authority;
+        uint16_t additional;
+    };
+    
+    std::vector<InetAddress> dns_servers_;
+    std::chrono::milliseconds timeout_{5000};
+};
+
+} // namespace lwip
