@@ -7,13 +7,14 @@ add_subdirectory(udp)
 add_subdirectory(utils)
 
 # 将所有组件作为 OBJECT 库组合到主库
-add_library(lwip_stack
+add_library(lwip_stack STATIC
     $<TARGET_OBJECTS:core>
     $<TARGET_OBJECTS:interface>
     $<TARGET_OBJECTS:ip>
     $<TARGET_OBJECTS:tcp>
     $<TARGET_OBJECTS:udp>
     $<TARGET_OBJECTS:utils>
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/inet_address.cpp
 )
 
 # 设置目标的包含目录

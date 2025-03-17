@@ -30,7 +30,7 @@ public:
     bool parse(const std::vector<uint8_t>& raw_data);
     std::vector<uint8_t> serialize() const;
     void set_payload(const std::vector<uint8_t>& data) { payload_ = data; }
-    uint16_t calculate_header_checksum() const;
+    inline uint16_t calculate_header_checksum() const;
     void set_addresses(uint32_t src, uint32_t dst) {
         header_.source_address = src;
         header_.destination_address = dst;
@@ -62,7 +62,7 @@ private:
     std::vector<uint8_t> payload_;
 };
 
-uint16_t IPPacket::calculate_header_checksum() const {
+inline uint16_t IPPacket::calculate_header_checksum() const {
     uint32_t sum = 0;
     const uint16_t* data = reinterpret_cast<const uint16_t*>(&header_);
     
