@@ -21,6 +21,7 @@ public:
     bool parse(const std::vector<uint8_t>& raw_data);
     std::vector<uint8_t> serialize() const;
     void set_payload(const std::vector<uint8_t>& payload);
+    const std::vector<uint8_t>& get_payload() const { return payload_; }
 
 private:
     IPv6Header header_;

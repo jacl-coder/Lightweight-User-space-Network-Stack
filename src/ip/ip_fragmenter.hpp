@@ -2,6 +2,7 @@
 #include "ip_packet.hpp"
 #include <map>
 #include <chrono>
+#include <unordered_map>
 
 #define MAX_FRAGMENTS 1000
 
@@ -29,6 +30,8 @@ private:
     
     std::map<uint16_t, FragmentInfo> fragments_;
     uint16_t total_length_{0};
+    std::unordered_map<uint32_t, uint16_t> path_mtu_cache_;
+    bool send_probe(uint32_t destination_ip, const std::vector<uint8_t>& data);
 };
 
 } // namespace lwip

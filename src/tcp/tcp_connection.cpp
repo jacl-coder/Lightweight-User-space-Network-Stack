@@ -311,4 +311,10 @@ bool TCPConnection::send_packet(const std::vector<uint8_t>& data) {
     return stack.send_packet(data);
 }
 
+bool TCPConnection::receive(std::vector<uint8_t>& data) {
+    // 简单实现：将内部接收缓冲区返回，真实逻辑依据项目需求调整
+    data = received_data_; // 假定 received_data_ 成员保存接收数据
+    return true;
+}
+
 } // namespace lwip

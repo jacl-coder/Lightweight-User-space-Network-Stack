@@ -4,10 +4,12 @@
 namespace lwip {
 
 void TCPRetransmitter::add_segment(const TCPPacket& packet) {
-    segments_.push({
+    // 使用 push_back 替代 push
+    segments_.push_back({
         packet,
         std::chrono::steady_clock::now(),
-        calculate_rto()
+        calculate_rto(),
+        0  // retries 默认值
     });
 }
 
@@ -59,8 +61,8 @@ void TCPRetransmitter::update_rto(double rtt) {
     }
     
     rto_ = srtt_ + 4 * rttvar_;
-    rto_ = std::max(rto_, RTO_MIN.count());
-    rto_ = std::min(rto_, RTO_MAX.count());
+    rto_ = std::max(rto_, static_cast<double>(RTO_MIN.count()));
+    rto_ = std::min(rto_, static_cast<double>(RTO_MAX.count()));
 }
 
 } // namespace lwip

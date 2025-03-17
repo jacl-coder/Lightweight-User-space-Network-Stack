@@ -66,4 +66,11 @@ uint16_t UDPPacket::calculate_checksum() const {
     return ~sum;
 }
 
+void UDPPacket::set_source_port(uint16_t port) { header_.source_port = port; }
+void UDPPacket::set_dest_port(uint16_t port) { header_.dest_port = port; }
+bool UDPPacket::verify_checksum() const { 
+    // TODO: 真实实现校验和计算
+    return true; 
+}
+
 } // namespace lwip

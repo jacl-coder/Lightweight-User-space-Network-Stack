@@ -24,6 +24,12 @@ public:
     const std::vector<uint8_t>& get_payload() const { return payload_; }
     void set_payload(const std::vector<uint8_t>& data) { payload_ = data; }
 
+    // 新增设置源/目标端口的方法
+    void set_source_port(uint16_t port);
+    void set_dest_port(uint16_t port);
+    // 新增校验和验证方法
+    bool verify_checksum() const;
+
 private:
     UDPHeader header_;
     std::vector<uint8_t> payload_;

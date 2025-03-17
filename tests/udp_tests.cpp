@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "../src/udp/udp_packet.hpp"
 #include "../src/core/stack_manager.hpp"
+#include "../src/utils/logger.hpp"  // Added include for Logger and LogLevel
 
 namespace lwip {
 namespace test {

@@ -4,6 +4,7 @@
 #include "../src/utils/logger.hpp"
 #include "../src/tcp/tcp_connection.hpp"
 #include "../src/udp/udp_packet.hpp"
+#include "../src/core/performance_monitor.hpp"
 
 namespace lwip {
 namespace test {

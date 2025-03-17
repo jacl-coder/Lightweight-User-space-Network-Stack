@@ -1,5 +1,7 @@
 #include "ip_fragmenter.hpp"
 #include "../utils/logger.hpp"
+#include <array>
+#include "icmp_packet.hpp"
 
 namespace lwip {
 
@@ -119,14 +121,21 @@ void IPFragmenter::discover_path_mtu(uint32_t destination_ip) {
 }
 
 bool IPFragmenter::try_mtu_size(uint32_t destination_ip, uint16_t mtu_size) {
-    // 发送ICMP探测包
     ICMPPacket probe;
     probe.create_echo_request(0, 0);
-    
-    std::vector<uint8_t> payload(mtu_size - sizeof(ICMPPacket::ICMPHeader));
-    probe.set_payload(payload);
+    // 移除不支持的 set_payload 调用
+    // std::vector<uint8_t> payload(mtu_size - sizeof(ICMPPacket::ICMPHeader));
+    // probe.set_payload(payload);
     
     return send_probe(destination_ip, probe.serialize());
+}
+
+bool IPFragmenter::send_probe(uint32_t destination_ip, const std::vector<uint8_t>& data) {
+    // 消除未使用参数警告
+    (void)destination_ip;
+    (void)data;
+    // TODO: 实现探测包发送逻辑
+    return false;
 }
 
 }

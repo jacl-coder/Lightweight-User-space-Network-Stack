@@ -1,5 +1,14 @@
 #include "ipv6_nd.hpp"
 #include "../utils/logger.hpp"
+#include <array>
+
+// 定义 NDMessage 结构（最低限度定义，用于编译）
+struct NDMessage {
+    uint8_t type;
+    uint8_t code;
+    uint16_t checksum;
+    std::array<uint8_t, 16> target_address;
+};
 
 namespace lwip {
 
@@ -22,11 +31,11 @@ bool IPv6NeighborDiscovery::send_neighbor_solicitation(const std::array<uint8_t,
 void IPv6NeighborDiscovery::handle_neighbor_advertisement(const IPv6Packet& packet) {
     // 解析邻居通告消息
     auto& payload = packet.get_payload();
-    if (payload.size() < sizeof(struct NDMessage)) {
+    if (payload.size() < sizeof(NDMessage)) {
         return;
     }
 
-    const auto* message = reinterpret_cast<const struct NDMessage*>(payload.data());
+    const NDMessage* message = reinterpret_cast<const NDMessage*>(payload.data());
     if (message->type == 136) {  // 邻居通告
         NeighborEntry entry;
         // TODO: 从选项中提取MAC地址

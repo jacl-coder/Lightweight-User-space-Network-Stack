@@ -25,6 +25,7 @@ public:
     EventLoop& get_event_loop() { return event_loop_; }
     BufferPool& get_buffer_pool() { return buffer_pool_; }
     bool send_packet(const std::vector<uint8_t>& packet); // 移到public
+    TCPManager& get_tcp_manager() { return tcp_manager_; } // Added public accessor
 
 private:
     StackManager();
