@@ -8,7 +8,7 @@ PerformanceMonitor& PerformanceMonitor::instance() {
     return instance;
 }
 
-void PerformanceMonitor::record_latency(const std::string& operation, std::chrono::microseconds latency) {
+void PerformanceMonitor::record_latency([[maybe_unused]] const std::string& operation, [[maybe_unused]] std::chrono::microseconds latency) {
     total_operations_++;
     // TODO: 实现延迟统计
 }
@@ -17,7 +17,7 @@ void PerformanceMonitor::record_throughput(size_t bytes) {
     total_bytes_ += bytes;
 }
 
-void PerformanceMonitor::record_error(const std::string& type) {
+void PerformanceMonitor::record_error([[maybe_unused]] const std::string& type) {
     error_count_++;
 }
 

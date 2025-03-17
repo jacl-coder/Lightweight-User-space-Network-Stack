@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <map>
 #include <chrono>
+#include <vector>
 #include "../utils/inet_address.hpp"
 
 namespace lwip {

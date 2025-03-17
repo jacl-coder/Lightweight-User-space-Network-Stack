@@ -3,37 +3,35 @@
 
 namespace lwip {
 
-EventLoop::EventLoop() : running_(false) {}
+EventLoop::EventLoop() = default;
+EventLoop::~EventLoop() = default;
+
+void EventLoop::post(std::function<void()> task) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    tasks_.push(std::move(task));
+    condition_.notify_one();
+}
 
 void EventLoop::run() {
     running_ = true;
-    thread_ = std::make_unique<std::thread>([this]() {
-        while (running_) {
-            EventCallback callback;
-            {
-                std::lock_guard<std::mutex> lock(mutex_);
-                if (!event_queue_.empty()) {
-                    callback = std::move(event_queue_.front());
-                    event_queue_.pop();
-                }
-            }
-            if (callback) {
-                callback();
-            }
+    while (running_) {
+        std::function<void()> task;
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            condition_.wait(lock, [this] { 
+                return !tasks_.empty() || !running_; 
+            });
+            if (!running_) break;
+            task = std::move(tasks_.front());
+            tasks_.pop();
         }
-    });
-}
-
-void EventLoop::post(EventCallback callback) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    event_queue_.push(std::move(callback));
+        task();
+    }
 }
 
 void EventLoop::stop() {
     running_ = false;
-    if (thread_ && thread_->joinable()) {
-        thread_->join();
-    }
+    condition_.notify_all();
 }
 
 } // namespace lwip

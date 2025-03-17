@@ -1,5 +1,6 @@
 #include "udp_packet.hpp"
 #include <arpa/inet.h>
+#include <cstring>
 
 namespace lwip {
 

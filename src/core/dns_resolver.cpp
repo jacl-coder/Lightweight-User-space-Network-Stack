@@ -1,7 +1,10 @@
 #include "dns_resolver.hpp"
 #include "../utils/logger.hpp"
+#include "../utils/inet_address.hpp"
 #include <arpa/inet.h>
 #include <cstring>
+#include <vector>
+#include <unistd.h>
 
 namespace lwip {
 
@@ -70,6 +73,11 @@ void DNSResolver::add_dns_server(const InetAddress& server) {
 
 void DNSResolver::set_timeout(std::chrono::milliseconds timeout) {
     timeout_ = timeout;
+}
+
+void DNSResolver::handle_query([[maybe_unused]] const UDPPacket& packet) {
+    LOG_INFO("Handling DNS query");
+    // 待实现DNS查询处理
 }
 
 } // namespace lwip

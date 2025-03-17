@@ -1,7 +1,9 @@
 #pragma once
 #include <string>
 #include <future>
-#include "../utils/inet_address.hpp"
+#include <vector>
+#include "../utils/inet_address.hpp"  // 改用 utils 目录下的 InetAddress
+#include "../udp/udp_packet.hpp"
 
 namespace lwip {
 
@@ -12,6 +14,7 @@ public:
     std::future<InetAddress> resolve(const std::string& hostname);
     void add_dns_server(const InetAddress& server);
     void set_timeout(std::chrono::milliseconds timeout);
+    void handle_query(const UDPPacket& packet);
 
 private:
     struct DNSHeader {

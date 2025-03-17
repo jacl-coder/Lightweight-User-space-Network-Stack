@@ -35,6 +35,27 @@ public:
         header_.source_address = src;
         header_.destination_address = dst;
     }
+
+    // 分片相关方法
+    void set_fragment_offset(uint16_t offset) {
+        header_.flags_fragment_offset = (header_.flags_fragment_offset & 0xE000) | (offset & 0x1FFF);
+    }
+
+    void set_more_fragments(bool more) {
+        if (more) {
+            header_.flags_fragment_offset |= 0x2000;
+        } else {
+            header_.flags_fragment_offset &= ~0x2000;
+        }
+    }
+
+    uint16_t get_fragment_offset() const {
+        return header_.flags_fragment_offset & 0x1FFF;
+    }
+
+    const std::vector<uint8_t>& get_payload() const {
+        return payload_;
+    }
     
 private:
     IPHeader header_;

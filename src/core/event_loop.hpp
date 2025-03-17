@@ -1,28 +1,26 @@
 #pragma once
 #include <functional>
-#include <memory>
 #include <queue>
-#include <thread>
+#include <mutex>
 #include <atomic>
+#include <condition_variable>
 
 namespace lwip {
 
 class EventLoop {
 public:
-    using EventCallback = std::function<void()>;
-    
     EventLoop();
     ~EventLoop();
-
-    void post(EventCallback callback);
+    
+    void post(std::function<void()> task);
     void run();
     void stop();
 
 private:
-    std::queue<EventCallback> event_queue_;
-    std::atomic<bool> running_{false};
-    std::unique_ptr<std::thread> thread_;
+    std::queue<std::function<void()>> tasks_;
     std::mutex mutex_;
+    std::condition_variable condition_;
+    std::atomic<bool> running_{false};
 };
 
 } // namespace lwip

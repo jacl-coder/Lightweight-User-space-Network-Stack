@@ -1,6 +1,6 @@
 #pragma once
 #include <atomic>
-#include <chrono>
+#include <string>
 
 namespace lwip {
 
@@ -14,6 +14,8 @@ public:
     void increment_tcp_connections() { active_tcp_connections_++; }
     void decrement_tcp_connections() { active_tcp_connections_--; }
 
+    // 添加获取统计信息的接口
+    std::string get_stats_report() const;
     uint64_t get_bytes_sent() const { return bytes_sent_; }
     uint64_t get_bytes_received() const { return bytes_received_; }
     uint32_t get_packets_dropped() const { return packets_dropped_; }

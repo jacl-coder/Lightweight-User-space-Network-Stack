@@ -1,6 +1,7 @@
 #include "tcp_connection.hpp"
 #include "../core/stack_manager.hpp"
 #include "../utils/logger.hpp"
+#include <algorithm>
 
 namespace lwip {
 
@@ -22,14 +23,15 @@ bool TCPConnection::connect(uint32_t remote_ip, uint16_t remote_port) {
     remote_port_ = remote_port;
     
     TCPPacket syn_packet;
-    syn_packet.header_.source_port = local_port_;
-    syn_packet.header_.dest_port = remote_port;
-    syn_packet.header_.sequence_number = local_seq_num_;
-    syn_packet.header_.flags = TCP_FLAG_SYN;
-    syn_packet.header_.window_size = 65535;
+    syn_packet.set_source_port(local_port_);
+    syn_packet.set_dest_port(remote_port);
+    syn_packet.set_sequence_number(local_seq_num_);
+    syn_packet.set_flags(TCP_FLAG_SYN);
+    syn_packet.set_window_size(65535);
     
-    auto& stack = StackManager::instance();
+    StackManager& stack = StackManager::instance();  // 使用引用
     if (!stack.send_packet(syn_packet.serialize())) {
+        LOG_ERROR("Failed to send SYN packet");
         return false;
     }
     
@@ -42,25 +44,34 @@ bool TCPConnection::send(const std::vector<uint8_t>& data) {
         return false;
     }
 
-    // 检查发送窗口
-    size_t available_window = std::min(window_.send_window_, window_.cwnd_);
-    if (available_window < data.size()) {
-        return false;
+    // 实现Nagle算法
+    if (nagle_enabled_ && unacked_data() > 0 && data.size() < max_segment_size_) {
+        pending_data_.insert(pending_data_.end(), data.begin(), data.end());
+        return true;
     }
 
-    // 分片发送
-    constexpr size_t MSS = 1460;
-    size_t offset = 0;
+    // 考虑发送窗口和拥塞窗口
+    size_t window = std::min(
+        static_cast<size_t>(tcp_params_.send_window),
+        static_cast<size_t>(tcp_params_.cwnd * max_segment_size_)
+    );
     
+    // 分片发送
+    size_t offset = 0;
     while (offset < data.size()) {
-        size_t chunk_size = std::min(MSS, data.size() - offset);
+        size_t chunk_size = std::min(
+            std::min(max_segment_size_, static_cast<uint16_t>(data.size() - offset)),
+            static_cast<uint16_t>(window)
+        );
+        
         TCPPacket packet;
         
-        packet.header_.sequence_number = local_seq_num_;
-        packet.header_.flags = TCP_FLAG_ACK;
+        packet.set_sequence_number(local_seq_num_);
+        packet.set_flags(TCP_FLAG_ACK);
         packet.set_payload({data.begin() + offset, data.begin() + offset + chunk_size});
         
-        if (!stack_manager_.send_packet(packet)) {
+        StackManager& stack = StackManager::instance();  // 使用引用
+        if (!stack.send_packet(packet.serialize())) {
             return false;
         }
 
@@ -80,53 +91,93 @@ bool TCPConnection::send(const std::vector<uint8_t>& data) {
 }
 
 bool TCPConnection::handle_packet(const TCPPacket& packet) {
+    last_activity_ = std::chrono::steady_clock::now();
+
     switch (state_) {
         case TCPState::CLOSED:
-            if (packet.header_.flags & TCP_FLAG_SYN) {
-                // 被动打开
-                remote_seq_num_ = packet.header_.sequence_number;
-                state_ = TCPState::SYN_RECEIVED;
+            if (packet.get_flags() & TCP_FLAG_SYN) {
+                // 收到SYN，准备接受新连接
+                remote_seq_num_ = packet.get_sequence_number();
                 send_syn_ack();
+                state_ = TCPState::SYN_RECEIVED;
+            }
+            break;
+            
+        case TCPState::LISTEN:
+            if (packet.get_flags() & TCP_FLAG_SYN) {
+                remote_seq_num_ = packet.get_sequence_number();
+                send_syn_ack();
+                state_ = TCPState::SYN_RECEIVED;
             }
             break;
             
         case TCPState::SYN_SENT:
-            if (packet.header_.flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) {
-                remote_seq_num_ = packet.header_.sequence_number + 1;
-                if (packet.header_.ack_number == local_seq_num_ + 1) {
+            if (packet.get_flags() & (TCP_FLAG_SYN | TCP_FLAG_ACK)) {
+                remote_seq_num_ = packet.get_sequence_number() + 1;
+                if (packet.get_ack_number() == local_seq_num_ + 1) {
                     local_seq_num_++;
-                    state_ = TCPState::ESTABLISHED;
                     send_ack();
+                    state_ = TCPState::ESTABLISHED;
                 }
             }
             break;
             
+        case TCPState::SYN_RECEIVED:
+            if (packet.get_flags() & TCP_FLAG_ACK) {
+                state_ = TCPState::ESTABLISHED;
+            }
+            break;
+            
         case TCPState::ESTABLISHED:
-            if (packet.header_.flags & TCP_FLAG_FIN) {
-                remote_seq_num_++;
+            if (packet.get_flags() & TCP_FLAG_FIN) {
                 state_ = TCPState::CLOSE_WAIT;
                 send_ack();
-            } else if (packet.header_.flags & TCP_FLAG_ACK) {
+            } else if (packet.get_flags() & TCP_FLAG_ACK) {
                 handle_data(packet);
                 update_window(packet);
             }
             break;
             
         case TCPState::FIN_WAIT_1:
-            if (packet.header_.flags & TCP_FLAG_ACK) {
+            if (packet.get_flags() & TCP_FLAG_ACK) {
                 state_ = TCPState::FIN_WAIT_2;
             }
             break;
             
-        // ...其他状态处理
+        case TCPState::FIN_WAIT_2:
+            if (packet.get_flags() & TCP_FLAG_FIN) {
+                send_ack();
+                state_ = TCPState::TIME_WAIT;
+            }
+            break;
+            
+        case TCPState::CLOSE_WAIT:
+            // 等待应用层关闭连接
+            break;
+            
+        case TCPState::CLOSING:
+            if (packet.get_flags() & TCP_FLAG_ACK) {
+                state_ = TCPState::TIME_WAIT;
+            }
+            break;
+            
+        case TCPState::LAST_ACK:
+            if (packet.get_flags() & TCP_FLAG_ACK) {
+                state_ = TCPState::CLOSED;
+            }
+            break;
+            
+        case TCPState::TIME_WAIT:
+            // 实现2MSL等待
+            break;
     }
     return true;
 }
 
 void TCPConnection::handle_data(const TCPPacket& packet) {
     if (packet.get_payload_size() > 0) {
-        // 检查序列号
-        if (packet.header_.sequence_number == remote_seq_num_) {
+        // 使用getter方法检查序列号
+        if (packet.get_sequence_number() == remote_seq_num_) {
             process_in_order_data(packet);
         } else {
             store_out_of_order_data(packet);
@@ -136,10 +187,10 @@ void TCPConnection::handle_data(const TCPPacket& packet) {
 
 void TCPConnection::update_window(const TCPPacket& packet) {
     // 更新发送窗口
-    window_.send_window_ = packet.header_.window_size;
+    window_.send_window_ = packet.get_window_size();
     
     // 更新拥塞窗口
-    if (packet.header_.flags & TCP_FLAG_ACK) {
+    if (packet.get_flags() & TCP_FLAG_ACK) {
         update_congestion_control(false);
     }
 }
@@ -179,33 +230,85 @@ void TCPConnection::update_congestion_control(bool is_timeout) {
     }
 }
 
-class TCPConnection {
-// ...existing code...
+void TCPConnection::update_rtt(std::chrono::milliseconds measured_rtt) {
+    double r = measured_rtt.count();
+    if (srtt_ == 0) {
+        srtt_ = r;
+        rttvar_ = r/2;
+    } else {
+        rttvar_ = 0.75 * rttvar_ + 0.25 * std::abs(srtt_ - r);
+        srtt_ = 0.875 * srtt_ + 0.125 * r;
+    }
+    rto_ = std::chrono::milliseconds(
+        static_cast<int>(srtt_ + std::max(1.0, 4*rttvar_))
+    );
+}
 
-private:
-    // 添加滑动窗口相关成员
-    struct WindowControl {
-        uint32_t send_window_{65535};
-        uint32_t recv_window_{65535};
-        uint32_t cwnd_{1460};        // 拥塞窗口
-        uint32_t ssthresh_{65535};   // 慢启动阈值
-    } window_;
-
-    // 添加拥塞控制状态
-    enum class CongestionState {
-        SLOW_START,
-        CONGESTION_AVOIDANCE,
-        FAST_RECOVERY
-    } congestion_state_{CongestionState::SLOW_START};
+void TCPConnection::handle_timeout() {
+    // 超时重传处理
+    tcp_params_.ssthresh = std::max(tcp_params_.cwnd / 2, static_cast<uint32_t>(2));
+    tcp_params_.cwnd = MSS;
+    in_fast_recovery_ = false;
     
-    // 重传队列
-    struct RetransmitSegment {
-        std::vector<uint8_t> data;
-        uint32_t sequence_number;
-        std::chrono::steady_clock::time_point sent_time;
-        int retries{0};
-    };
-    std::queue<RetransmitSegment> retransmit_queue_;
-};
+    if (state_ == TCPState::ESTABLISHED) {
+        retransmit_unacked_segments();
+    }
+}
+
+bool TCPConnection::is_timeout() const {
+    return std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now() - last_activity_
+    ).count() > TIMEOUT_SECONDS;
+}
+
+size_t TCPConnection::unacked_data() const {
+    return unacked_segments_.size();
+}
+
+void TCPConnection::send_syn_ack() {
+    TCPPacket packet;
+    packet.set_flags(TCP_FLAG_SYN | TCP_FLAG_ACK);
+    packet.set_sequence_number(local_seq_num_);
+    packet.set_ack_number(remote_seq_num_ + 1);
+    send_packet(packet);
+}
+
+void TCPConnection::send_ack() {
+    TCPPacket packet;
+    packet.set_flags(TCP_FLAG_ACK);
+    packet.set_sequence_number(local_seq_num_);
+    packet.set_ack_number(remote_seq_num_ + 1);
+    send_packet(packet);
+}
+
+void TCPConnection::process_in_order_data(const TCPPacket& packet) {
+    // 处理按序到达的数据
+    received_data_.insert(received_data_.end(), 
+                         packet.get_payload().begin(), 
+                         packet.get_payload().end());
+    remote_seq_num_ += packet.get_payload_size();
+}
+
+void TCPConnection::store_out_of_order_data(const TCPPacket& packet) {
+    // 存储乱序数据
+    out_of_order_data_[packet.get_sequence_number()] = packet.get_payload();
+}
+
+void TCPConnection::retransmit_unacked_segments() {
+    // 重传未确认的数据段
+    for (const auto& segment : unacked_segments_) {
+        send_packet(segment);
+    }
+}
+
+bool TCPConnection::send_packet(const TCPPacket& packet) {
+    auto& stack = StackManager::instance();
+    return stack.send_packet(packet.serialize());
+}
+
+bool TCPConnection::send_packet(const std::vector<uint8_t>& data) {
+    auto& stack = StackManager::instance();
+    return stack.send_packet(data);
+}
 
 } // namespace lwip

@@ -17,7 +17,7 @@ PacketCapture::~PacketCapture() {
     }
 }
 
-void PacketCapture::capture_packet(const void* data, size_t len, bool is_incoming) {
+void PacketCapture::capture_packet(const void* data, size_t len, [[maybe_unused]] bool is_incoming) {
     if (!file_.is_open()) return;
 
     // PCAP数据包头

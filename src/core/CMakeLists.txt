@@ -1,4 +1,4 @@
-add_library(core
+add_library(core OBJECT
     stack_manager.cpp
     event_loop.cpp
     dns_resolver.cpp
@@ -6,3 +6,4 @@ add_library(core
 )
 
 target_include_directories(core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(core PRIVATE utils)

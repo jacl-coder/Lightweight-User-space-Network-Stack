@@ -15,6 +15,15 @@ bool ICMPPacket::create_echo_request(uint16_t identifier, uint16_t sequence) {
     return true;
 }
 
+bool ICMPPacket::create_echo_reply(const ICMPPacket& request) {
+    header_.type = 0;  // ECHO应答
+    header_.code = 0;
+    header_.rest_of_header = request.header_.rest_of_header;
+    payload_ = request.payload_;
+    header_.checksum = calculate_checksum();
+    return true;
+}
+
 bool ICMPPacket::parse(const std::vector<uint8_t>& data) {
     if (data.size() < sizeof(ICMPHeader)) {
         return false;

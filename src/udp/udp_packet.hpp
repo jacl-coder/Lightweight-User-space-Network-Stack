@@ -18,6 +18,12 @@ public:
     std::vector<uint8_t> serialize() const;
     uint16_t calculate_checksum() const;
 
+    // 添加访问方法
+    uint16_t get_source_port() const { return header_.source_port; }
+    uint16_t get_dest_port() const { return header_.dest_port; }
+    const std::vector<uint8_t>& get_payload() const { return payload_; }
+    void set_payload(const std::vector<uint8_t>& data) { payload_ = data; }
+
 private:
     UDPHeader header_;
     std::vector<uint8_t> payload_;
